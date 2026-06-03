@@ -1,19 +1,19 @@
 import streamlit as st
 import random
+import time
 
-# =========================
-# ページ設定
-# =========================
+from data import VOCAB_DATA
+from data import MEANING_CHOICES
 
 st.set_page_config(
-    page_title="TOEIC Unit Trainer",
-    page_icon="📚",
-    layout="wide"
+    page_title="TOEIC Vocabulary Trainer",
+    page_icon="📘",
+    layout="centered"
 )
 
-# =========================
+# --------------------
 # UI
-# =========================
+# --------------------
 
 st.markdown("""
 <style>
@@ -22,405 +22,200 @@ st.markdown("""
     background-color: #fcfaf7;
 }
 
-.word-card {
-    background-color:#f3ede4;
-    padding:20px;
-    border-radius:10px;
-    border:2px solid #d97706;
-    margin-bottom:15px;
-}
-
-.target-badge {
-    background-color:#ea580c;
+.word-badge {
+    background:#ea580c;
     color:white;
-    padding:10px 18px;
+    padding:10px 20px;
     border-radius:8px;
     display:inline-block;
     font-weight:bold;
-    font-size:22px;
+    font-size:1.3rem;
+}
+
+.scan-cover{
+    background:#ddd;
+    border-radius:10px;
+    padding:40px;
+    text-align:center;
+    font-size:1.2rem;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# =========================
-# 問題データ
-# =========================
-
-WORDS = [
-
-{
-    "word":"benefit",
-
-    "meaning":"利益・恩恵",
-
-    "meaning_choices":[
-        "利益・恩恵",
-        "経験",
-        "契約",
-        "需要"
-    ],
-
-    "synonyms":[
-        "advantage",
-        "perk"
-    ],
-
-    "synonym_choices":[
-        "advantage",
-        "perk",
-        "labor",
-        "wage",
-        "supply"
-    ],
-
-    "scanning_questions":[
-
-        {
-            "target":"advantage",
-
-            "passage":
-            """
-            Working remotely has several advantages for employees.
-            It reduces commuting time and improves work-life balance.
-            Many companies now offer flexible schedules.
-            """
-        },
-
-        {
-            "target":"perk",
-
-            "passage":
-            """
-            One perk of working at this company is the free lunch program.
-            Employees can enjoy healthy meals every day.
-            This helps improve workplace satisfaction.
-            """
-        }
-    ]
-},
-
-{
-    "word":"expertise",
-
-    "meaning":"専門知識",
-
-    "meaning_choices":[
-        "専門知識",
-        "給料",
-        "商品",
-        "広告"
-    ],
-
-    "synonyms":[
-        "knowledge",
-        "skill",
-        "experience"
-    ],
-
-    "synonym_choices":[
-        "knowledge",
-        "skill",
-        "experience",
-        "demand",
-        "labor",
-        "wage"
-    ],
-
-    "scanning_questions":[
-
-        {
-            "target":"knowledge",
-
-            "passage":
-            """
-            New employees receive extensive training.
-            This gives them the knowledge necessary to succeed.
-            Managers are available to answer questions.
-            """
-        },
-
-        {
-            "target":"skill",
-
-            "passage":
-            """
-            Strong communication skills are highly valued.
-            They help employees work effectively with clients.
-            Teamwork is also important.
-            """
-        },
-
-        {
-            "target":"experience",
-
-            "passage":
-            """
-            Candidates with previous experience are preferred.
-            They can adapt to the role more quickly.
-            The company values practical understanding.
-            """
-        }
-    ]
-},
-
-{
-    "word":"freelancer",
-
-    "meaning":"フリーランス",
-
-    "meaning_choices":[
-        "フリーランス",
-        "正社員",
-        "管理職",
-        "顧客"
-    ],
-
-    "synonyms":[
-        "independent worker",
-        "contractor"
-    ],
-
-    "synonym_choices":[
-        "independent worker",
-        "contractor",
-        "manager",
-        "supplier",
-        "client"
-    ],
-
-    "scanning_questions":[
-
-        {
-            "target":"contractor",
-
-            "passage":
-            """
-            The company hired a contractor for the project.
-            He was not a full-time employee.
-            His contract will end after six months.
-            """
-        },
-
-        {
-            "target":"independent",
-
-            "passage":
-            """
-            She works independently and chooses her own clients.
-            This flexibility allows her to travel frequently.
-            Many professionals prefer this style of work.
-            """
-        }
-    ]
-}
-
-]
-
-# =========================
-# session
-# =========================
-
-if "current_word" not in st.session_state:
-    st.session_state.current_word = 0
+# --------------------
+# session state
+# --------------------
 
 if "answers" not in st.session_state:
     st.session_state.answers = {}
 
-# =========================
+if "scan_started" not in st.session_state:
+    st.session_state.scan_started = False
+
+if "scan_start_time" not in st.session_state:
+    st.session_state.scan_start_time = None
+
+# --------------------
 # sidebar
-# =========================
+# --------------------
 
-with st.sidebar:
+st.sidebar.title("Unit 2 Vocabulary")
 
-    st.title("📚 TOEIC Trainer")
-
-    for i, item in enumerate(WORDS):
-
-        if st.button(
-            f"{i+1}. {item['word']}",
-            use_container_width=True
-        ):
-            st.session_state.current_word = i
-            st.rerun()
-
-    st.divider()
-
-    if st.button(
-        "📊 結果を見る",
-        use_container_width=True
-    ):
-        st.session_state.current_word = "result"
-        st.rerun()
-
-# =========================
-# 結果ページ
-# =========================
-
-if st.session_state.current_word == "result":
-
-    st.title("📊 学習結果")
-
-    total = len(WORDS) * 3
-    correct = 0
-
-    for result in st.session_state.answers.values():
-        correct += sum(result.values())
-
-    st.metric(
-        "正答率",
-        f"{(correct/total)*100:.1f}%"
-        if total > 0 else "0%"
-    )
-
-    st.write("---")
-
-    st.subheader("間違えた問題")
-
-    for word, result in st.session_state.answers.items():
-
-        if not all(result.values()):
-
-            st.write(f"### ❌ {word}")
-
-            if not result["q1"]:
-                st.write("- Q1 意味問題")
-
-            if not result["q2"]:
-                st.write("- Q2 類語問題")
-
-            if not result["q3"]:
-                st.write("- Q3 スキャニング")
-
-    st.stop()
-
-# =========================
-# 問題ページ
-# =========================
-
-data = WORDS[st.session_state.current_word]
-
-st.progress(
-    (st.session_state.current_word+1)/len(WORDS)
+selected_word = st.sidebar.radio(
+    "単語一覧",
+    range(len(VOCAB_DATA)),
+    format_func=lambda x:
+        f"{x+1}. {VOCAB_DATA[x]['word']}"
 )
 
+q = VOCAB_DATA[selected_word]
+
+# --------------------
+# header
+# --------------------
+
 st.markdown(
-    f'<div class="target-badge">{data["word"].upper()}</div>',
+    f"<div class='word-badge'>{q['word']}</div>",
     unsafe_allow_html=True
 )
 
 st.write("")
 
-# ------------------
+# ====================
 # Q1
-# ------------------
+# ====================
 
-st.subheader("Q1 意味を選んでください")
+st.subheader("Q1 意味問題")
+
+choices = [q["meaning"]]
+
+while len(choices) < 4:
+    c = random.choice(MEANING_CHOICES)
+    if c not in choices:
+        choices.append(c)
+
+random.shuffle(choices)
 
 q1 = st.radio(
-    "",
-    data["meaning_choices"]
+    "最も適切な意味を選びましょう",
+    choices,
+    key=f"q1_{selected_word}"
 )
 
-# ------------------
+# ====================
 # Q2
-# ------------------
+# ====================
 
-st.subheader("Q2 類語をすべて選んでください")
+st.subheader("Q2 類語問題")
+
+correct_synonyms = q["synonyms"]
 
 st.caption(
-    f"正解は {len(data['synonyms'])} 個あります"
+    f"正解は {len(correct_synonyms)} 個あります"
 )
 
 selected_synonyms = []
 
-for item in data["synonym_choices"]:
+all_choices = correct_synonyms.copy()
 
-    if st.checkbox(item):
+fake_pool = []
 
-        selected_synonyms.append(item)
+for vocab in VOCAB_DATA:
+    fake_pool.extend(vocab["synonyms"])
 
-# ------------------
-# Q3
-# ------------------
+fake_pool = list(set(fake_pool))
 
-st.subheader("Q3 同じ意味の単語をクリック")
+while len(all_choices) < 6:
+    f = random.choice(fake_pool)
+    if f not in all_choices:
+        all_choices.append(f)
 
-question = random.choice(
-    data["scanning_questions"]
-)
+random.shuffle(all_choices)
 
-st.info(question["passage"])
+for option in all_choices:
 
-selected_word = None
+    checked = st.checkbox(
+        option,
+        key=f"{selected_word}_{option}"
+    )
 
-words = question["passage"].replace("\n", " ").split()
+    if checked:
+        selected_synonyms.append(option)
 
-cols = st.columns(min(len(words), 8))
+# ====================
+# scan
+# ====================
 
-for i, word in enumerate(words):
+st.divider()
 
-    with cols[i % 8]:
+st.subheader("Q3 スキャニング")
 
-        if st.button(
-            word,
-            key=f"{i}_{word}"
-        ):
-            selected_word = word.strip(".,").lower()
+if not st.session_state.scan_started:
 
-# ------------------
-# 採点
-# ------------------
+    st.markdown(
+        """
+        <div class='scan-cover'>
+        スキャニング問題はまだ開始されていません
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if st.button(
+        "🚀 スキャニング開始！",
+        type="primary"
+    ):
+
+        st.session_state.scan_started = True
+        st.session_state.scan_start_time = time.time()
+
+        st.rerun()
+
+else:
+
+    elapsed = (
+        time.time()
+        - st.session_state.scan_start_time
+    )
+
+    st.info(
+        f"経過時間: {elapsed:.1f} 秒"
+    )
+
+    st.warning(
+        "次にHTMLクリック式へ差し替えます"
+    )
+
+# ====================
+# save
+# ====================
+
+st.divider()
 
 if st.button(
-    "採点する",
+    "この回答でOK",
     type="primary"
 ):
 
     q1_correct = (
-        q1 == data["meaning"]
+        q1 == q["meaning"]
     )
 
     q2_correct = (
         set(selected_synonyms)
         ==
-        set(data["synonyms"])
+        set(correct_synonyms)
     )
 
-    q3_correct = (
-        selected_word ==
-        question["target"].lower()
-    )
-
-    st.session_state.answers[
-        data["word"]
-    ] = {
+    st.session_state.answers[q["word"]] = {
 
         "q1": q1_correct,
+
         "q2": q2_correct,
-        "q3": q3_correct
+
+        "selected":
+        selected_synonyms
     }
 
-    st.write("---")
-
-    st.success(
-        f"Q1 {'⭕' if q1_correct else '❌'}"
-    )
-
-    st.success(
-        f"Q2 {'⭕' if q2_correct else '❌'}"
-    )
-
-    st.success(
-        f"Q3 {'⭕' if q3_correct else '❌'}"
-    )
-
-    score = sum([
-        q1_correct,
-        q2_correct,
-        q3_correct
-    ])
-
-    st.subheader(
-        f"この単語のスコア: {score}/3"
-    )
+    st.success("保存しました")
