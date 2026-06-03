@@ -1,6 +1,7 @@
 import streamlit as st
 import random
 import time
+import streamlit.components.v1 as components
 
 from data import VOCAB_DATA
 from data import MEANING_CHOICES
@@ -12,17 +13,17 @@ st.set_page_config(
 )
 
 # --------------------
-# UI
+# CSS
 # --------------------
 
 st.markdown("""
 <style>
 
-.stApp {
-    background-color: #fcfaf7;
+.stApp{
+    background-color:#fcfaf7;
 }
 
-.word-badge {
+.word-badge{
     background:#ea580c;
     color:white;
     padding:10px 20px;
@@ -33,11 +34,20 @@ st.markdown("""
 }
 
 .scan-cover{
-    background:#ddd;
+    background:#dddddd;
     border-radius:10px;
     padding:40px;
     text-align:center;
     font-size:1.2rem;
+}
+
+.scan-box{
+    background:white;
+    border:1px solid #dddddd;
+    border-radius:12px;
+    padding:24px;
+    line-height:2.2;
+    font-size:22px;
 }
 
 </style>
@@ -50,11 +60,14 @@ st.markdown("""
 if "answers" not in st.session_state:
     st.session_state.answers = {}
 
-if "scan_started" not in st.session_state:
-    st.session_state.scan_started = False
+if "scan_started_word" not in st.session_state:
+    st.session_state.scan_started_word = None
 
 if "scan_start_time" not in st.session_state:
     st.session_state.scan_start_time = None
+
+if "scan_times" not in st.session_state:
+    st.session_state.scan_times = {}
 
 # --------------------
 # sidebar
@@ -91,13 +104,15 @@ st.subheader("Q1 意味問題")
 choices = [q["meaning"]]
 
 while len(choices) < 4:
-    c = random.choice(MEANING_CHOICES)
-    if c not in choices:
-        choices.append(c)
+
+    candidate = random.choice(MEANING_CHOICES)
+
+    if candidate not in choices:
+        choices.append(candidate)
 
 random.shuffle(choices)
 
-q1 = st.radio(
+q1_answer = st.radio(
     "最も適切な意味を選びましょう",
     choices,
     key=f"q1_{selected_word}"
@@ -112,7 +127,7 @@ st.subheader("Q2 類語問題")
 correct_synonyms = q["synonyms"]
 
 st.caption(
-    f"正解は {len(correct_synonyms)} 個あります"
+    f"{len(correct_synonyms)}個選択"
 )
 
 selected_synonyms = []
@@ -127,9 +142,11 @@ for vocab in VOCAB_DATA:
 fake_pool = list(set(fake_pool))
 
 while len(all_choices) < 6:
-    f = random.choice(fake_pool)
-    if f not in all_choices:
-        all_choices.append(f)
+
+    candidate = random.choice(fake_pool)
+
+    if candidate not in all_choices:
+        all_choices.append(candidate)
 
 random.shuffle(all_choices)
 
@@ -143,15 +160,22 @@ for option in all_choices:
     if checked:
         selected_synonyms.append(option)
 
-# ====================
-# scan
-# ====================
-
 st.divider()
+
+# ====================
+# Q3
+# ====================
 
 st.subheader("Q3 スキャニング")
 
-if not st.session_state.scan_started:
+current_word = q["word"]
+
+scan_running = (
+    st.session_state.scan_started_word
+    == current_word
+)
+
+if not scan_running:
 
     st.markdown(
         """
@@ -164,42 +188,149 @@ if not st.session_state.scan_started:
 
     if st.button(
         "🚀 スキャニング開始！",
-        type="primary"
+        type="primary",
+        key=f"start_{current_word}"
     ):
 
-        st.session_state.scan_started = True
-        st.session_state.scan_start_time = time.time()
+        st.session_state.scan_started_word = (
+            current_word
+        )
+
+        st.session_state.scan_start_time = (
+            time.time()
+        )
 
         st.rerun()
 
 else:
 
-    elapsed = (
-        time.time()
-        - st.session_state.scan_start_time
+    target = None
+
+    for synonym in q["synonyms"]:
+        if synonym in q["scan_text"]:
+            target = synonym
+            break
+
+    if target is None:
+        st.error("scan_text内に類語が見つかりません")
+        st.stop()
+
+    scan_html = q["scan_text"].replace(
+        target,
+        f'<span id="target" onclick="found()" style="cursor:pointer;">{target}</span>'
     )
 
-    st.info(
-        f"経過時間: {elapsed:.1f} 秒"
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <body>
+
+    <div style="
+        background:white;
+        border:1px solid #dddddd;
+        border-radius:12px;
+        padding:24px;
+        font-size:22px;
+        line-height:2.2;
+        white-space:pre-line;
+        font-family:sans-serif;
+    ">
+
+    {scan_html}
+
+    </div>
+
+    <div id="timer"
+         style="
+         margin-top:18px;
+         font-size:20px;
+         font-weight:bold;
+         ">
+         ⏱️ 0.0 sec
+    </div>
+
+    <script>
+
+    const startTime = Date.now();
+
+    let finished = false;
+
+    const timer = setInterval(() => {{
+
+        if(finished) return;
+
+        const elapsed =
+            ((Date.now()-startTime)/1000)
+            .toFixed(1);
+
+        document.getElementById("timer")
+            .innerHTML =
+            "⏱️ " + elapsed + " sec";
+
+    }},100);
+
+    function found() {{
+
+        if(finished) return;
+
+        finished = true;
+
+        const elapsed =
+            ((Date.now()-startTime)/1000)
+            .toFixed(2);
+
+        document.getElementById("timer")
+            .innerHTML =
+            "✅ Found! " + elapsed + " sec";
+
+        document.getElementById("target")
+            .style.background =
+            "#fde68a";
+
+        document.getElementById("target")
+            .style.fontWeight =
+            "bold";
+
+        document.getElementById("target")
+            .style.borderRadius =
+            "4px";
+
+        document.getElementById("target")
+            .style.padding =
+            "2px 4px";
+    }}
+
+    </script>
+
+    </body>
+    </html>
+    """
+
+    components.html(
+        html,
+        height=650,
+        scrolling=False
     )
 
-    st.warning(
-        "次にHTMLクリック式へ差し替えます"
+    st.caption(
+        "文章中からQ2で学習した類語を探してください"
     )
 
 # ====================
-# save
+# 保存
 # ====================
 
 st.divider()
 
 if st.button(
     "この回答でOK",
-    type="primary"
+    type="primary",
+    key=f"save_{current_word}"
 ):
 
     q1_correct = (
-        q1 == q["meaning"]
+        q1_answer
+        == q["meaning"]
     )
 
     q2_correct = (
@@ -208,14 +339,151 @@ if st.button(
         set(correct_synonyms)
     )
 
-    st.session_state.answers[q["word"]] = {
+    elapsed = (
+    time.time()
+    - st.session_state.scan_start_time
+    )
+
+    st.session_state.scan_times[
+    current_word
+    ] = round(elapsed, 2)
+
+    st.session_state.answers[
+        current_word
+    ] = {
 
         "q1": q1_correct,
 
         "q2": q2_correct,
 
-        "selected":
-        selected_synonyms
+        "selected": selected_synonyms
     }
 
-    st.success("保存しました")
+    st.success(
+        f"{current_word} を保存しました"
+    )
+
+# ====================
+# 回答状況
+# ====================
+
+st.sidebar.divider()
+
+saved_count = len(
+    st.session_state.answers
+)
+
+st.sidebar.write(
+    f"保存済み: {saved_count}/24"
+)
+
+# ====================
+# 結果表示
+# ====================
+
+if saved_count > 0:
+
+    st.sidebar.divider()
+
+    if st.sidebar.button("結果を見る"):
+
+        st.subheader("学習結果")
+
+        total_q1 = 0
+        total_q2 = 0
+
+        for word, result in (
+            st.session_state.answers.items()
+        ):
+
+            if result["q1"]:
+                total_q1 += 1
+
+            if result["q2"]:
+                total_q2 += 1
+
+        st.write(
+            f"Q1正解数: {total_q1}/{saved_count}"
+        )
+
+        st.write(
+            f"Q2正解数: {total_q2}/{saved_count}"
+        )
+
+        st.divider()
+
+        st.subheader("スキャニング結果")
+
+        total_scan_time = 0
+
+        for word, t in (
+            st.session_state.scan_times.items()
+        ):
+
+            total_scan_time += t
+
+            st.write(
+                f"{word} : {t:.2f} 秒"
+            )
+
+        st.divider()
+
+        st.subheader(
+            f"合計スキャン時間: {total_scan_time:.2f} 秒"
+        )
+
+        
+        average_time = (
+        total_scan_time
+        / len(st.session_state.scan_times)
+        )
+
+        st.write(
+        f"平均スキャン時間: {average_time:.2f} 秒"
+        )
+
+        if average_time < 3:
+
+            title = "👑 TOEIC level 990"
+
+        elif average_time < 4:
+
+            title = "⚡ TOEIC level 900"
+
+        elif average_time < 6:
+
+            title = "🔥 TOEIC level 800"
+
+        elif average_time < 7:
+
+            title = "📚 TOEIC level 700"
+
+        else:
+
+            title = "🌱 まだまだです"
+
+        st.success(
+            f"称号：{title}"
+        )
+
+        st.divider()
+
+        for word, result in (
+            st.session_state.answers.items()
+        ):
+
+            q1_mark = (
+            "⭕"
+            if result["q1"]
+            else "❌"
+            )
+
+            q2_mark = (
+            "⭕"
+            if result["q2"]
+            else "❌"
+            )
+
+            st.write(
+                 f"{word}　Q1:{q1_mark}　Q2:{q2_mark}"
+            )   
