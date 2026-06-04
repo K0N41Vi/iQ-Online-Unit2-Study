@@ -2,6 +2,7 @@ import streamlit as st
 import random
 import time
 import streamlit.components.v1 as components
+from streamlit_javascript import st_javascript
 
 from data import VOCAB_DATA
 from data import MEANING_CHOICES
@@ -68,6 +69,12 @@ if "scan_start_time" not in st.session_state:
 
 if "scan_times" not in st.session_state:
     st.session_state.scan_times = {}
+
+if "scan_finished" not in st.session_state:
+    st.session_state.scan_finished = {}
+
+if "scan_click_time" not in st.session_state:
+    st.session_state.scan_click_time = None
 
 # --------------------
 # sidebar
@@ -275,9 +282,16 @@ else:
 
         finished = true;
 
+        clearInterval(timer);
+
         const elapsed =
             ((Date.now()-startTime)/1000)
             .toFixed(2);
+
+        localStorage.setItem(
+            "scan_time",
+            elapsed
+        );
 
         document.getElementById("timer")
             .innerHTML =
@@ -312,6 +326,27 @@ else:
         scrolling=False
     )
 
+    clicked_time = st_javascript(
+        "localStorage.getItem('scan_time')"
+    )
+
+
+    if clicked_time:
+
+        try:
+
+            st.session_state.scan_click_time = (
+                float(clicked_time)
+            )
+
+        except:
+            pass
+
+    st.metric(
+        "発見時間",
+        f"{st.session_state.scan_click_time:.2f} 秒"
+    )
+
     st.caption(
         "文章中からQ2で学習した類語を探してください"
     )
@@ -339,14 +374,16 @@ if st.button(
         set(correct_synonyms)
     )
 
-    elapsed = (
-    time.time()
-    - st.session_state.scan_start_time
-    )
+    if (
+        st.session_state.scan_click_time
+        is not None
+    ):
 
-    st.session_state.scan_times[
-    current_word
-    ] = round(elapsed, 2)
+        st.session_state.scan_times[
+            current_word
+        ] = (
+            st.session_state.scan_click_time
+        )
 
     st.session_state.answers[
         current_word
@@ -358,6 +395,12 @@ if st.button(
 
         "selected": selected_synonyms
     }
+
+    st.session_state.scan_started_word = None
+
+    st.session_state.scan_start_time = None
+
+    st.session_state.scan_click_time = None
 
     st.success(
         f"{current_word} を保存しました"
@@ -410,6 +453,16 @@ if saved_count > 0:
             f"Q2正解数: {total_q2}/{saved_count}"
         )
 
+        accuracy = (
+            (total_q1 + total_q2)
+            /
+            (saved_count * 2)
+        ) * 100
+
+        st.write(
+            f"総合正答率: {accuracy:.1f}%"
+        )
+
         st.divider()
 
         st.subheader("スキャニング結果")
@@ -442,24 +495,19 @@ if saved_count > 0:
         f"平均スキャン時間: {average_time:.2f} 秒"
         )
 
-        if average_time < 3:
-
+        if average_time < 3 and accuracy >= 90:
             title = "👑 TOEIC level 990"
 
-        elif average_time < 4:
-
+        elif average_time < 4 and accuracy >= 80:
             title = "⚡ TOEIC level 900"
 
         elif average_time < 6:
-
             title = "🔥 TOEIC level 800"
 
         elif average_time < 7:
-
             title = "📚 TOEIC level 700"
 
         else:
-
             title = "🌱 まだまだです"
 
         st.success(
