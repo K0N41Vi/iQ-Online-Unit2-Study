@@ -2,6 +2,8 @@
 
 Study application for iQ Online Unit 2 vocabulary
 
+🚀 **[Open Application](https://iQ-Online-Unit2-Study.streamlit.app/)** - Click here to start studying!
+
 ## Overview
 
 This is a Streamlit-based TOEIC Vocabulary Trainer application that helps users study Unit 2 vocabulary through interactive quizzes and scanning exercises.
