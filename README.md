@@ -2,7 +2,7 @@
 
 Study application for iQ Online Unit 2 vocabulary
 
-🚀 **[Open Application](https://iQ-Online-Unit2-Study.streamlit.app/)** - Click here to start studying!
+🚀 **[Open Application]([https://iQ-Online-Unit2-Study.streamlit.app/](https://iqonline2study.streamlit.app/))** - Click here to start studying!
 
 ## Overview
 
